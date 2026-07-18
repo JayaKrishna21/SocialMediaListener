@@ -59,4 +59,70 @@ Results are written to two dedicated worksheet tabs, one per platform, each cont
 | Content Snippet | A truncated preview of the content |
 | URL | Direct link to the original post |
 
-## Project structure
+---
+
+## Project Structure
+
+```text
+social-keyword-monitor/
+│
+├── src/
+│   ├── main.py                    # Pipeline orchestrator
+│   ├── keyword_extractor.py       # Reads keyword documents
+│   ├── sheets_writer.py           # Writes results into Google Sheets
+│   │
+│   └── collectors/
+│       ├── base.py                # Shared collector interface
+│       ├── tiktok_collector.py    # TikTok data collection
+│       └── instagram_collector.py # Instagram data collection
+│
+├── data/
+│   ├── tiktok_keywords.docx
+│   ├── instagram_keywords.docx
+│   └── service_account.json       # Google Service Account credentials
+│                                  # (Excluded from version control)
+│
+├── .github/
+│   └── workflows/
+│       └── daily-run.yml          # GitHub Actions schedule
+│
+├── reqs.txt                       # Python dependencies
+└── README.md
+```
+
+---
+## Setup
+
+1. Install dependencies:
+```bash
+   pip install -r reqs.txt
+```
+
+2. Populate keyword lists in `data/tiktok_keywords.docx` and `data/instagram_keywords.docx`, one entry per line. Instagram entries must begin with `#`, as that collector operates on hashtag-based discovery only.
+
+3. Create a Google Cloud service account, enable the Sheets and Drive APIs, and share the target spreadsheet with the service account's email address. Save the generated key as `data/service_account.json`.
+
+4. Copy `.env.example` to `.env` and populate the required values (Sheet ID, search-provider credentials).
+
+5. Run locally to verify configuration:
+```bash
+   python src/main.py
+```
+
+6. For automated scheduling, push the repository to GitHub and configure the required secrets under Settings -> Secrets and variables -> Actions. The workflow defined in `.github/workflows/daily-run.yml` handles the rest.
+
+## Configuration
+
+The following are configurable via environment variables, requiring no code changes:
+
+| Variable pattern | Purpose |
+|---|---|
+| `*_TARGET_MATCHES_PER_KEYWORD` | Target number of genuine matches to retrieve per keyword |
+| `*_MAX_RAW_RESULTS_PER_KEYWORD` | Upper bound on raw results requested, bounding cost regardless of match rate |
+| `*_LANGUAGE_FILTER` | Restricts results to a single language |
+| `*_LOOKBACK_HOURS` / `*_LOOKBACK_DAYS` | Controls how far back each platform searches |
+| `*_COLLECT_COMMENTS` | Enables or disables comment-level collection |
+
+## Security
+
+Credentials (`.env`, `data/service_account.json`) are excluded from version control via `.gitignore` and never committed to the repository. All secrets used in automated runs are stored as encrypted GitHub Actions secrets.
