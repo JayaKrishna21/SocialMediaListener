@@ -1,0 +1,57 @@
+﻿name: Daily keyword monitor
+
+on:
+  schedule:
+    - cron: '0 11 */2 * *'
+  workflow_dispatch: {}
+
+jobs:
+  run-monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r reqs.txt
+
+      - name: Write Google service account credentials to file
+        run: echo "$GOOGLE_SERVICE_ACCOUNT_JSON" > data/service_account.json
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+
+      - name: Run the pipeline
+        run: python src/main.py
+        env:
+          APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_FILE: ./data/service_account.json
+
+          TIKTOK_KEYWORDS_DOCX_PATH: ./data/tiktok_keywords.docx
+          TIKTOK_SEARCH_ACTOR_ID: ${{ vars.TIKTOK_SEARCH_ACTOR_ID || 'clockworks/tiktok-scraper' }}
+          TIKTOK_HASHTAG_ACTOR_ID: ${{ vars.TIKTOK_HASHTAG_ACTOR_ID || 'clockworks/tiktok-scraper' }}
+          TIKTOK_COMMENTS_ACTOR_ID: ${{ vars.TIKTOK_COMMENTS_ACTOR_ID || 'clockworks/tiktok-comments-scraper' }}
+          TIKTOK_TARGET_MATCHES_PER_KEYWORD: ${{ vars.TIKTOK_TARGET_MATCHES_PER_KEYWORD || '10' }}
+          TIKTOK_SEARCH_BATCH_SIZE: ${{ vars.TIKTOK_SEARCH_BATCH_SIZE || '20' }}
+          TIKTOK_MAX_RAW_RESULTS_PER_KEYWORD: ${{ vars.TIKTOK_MAX_RAW_RESULTS_PER_KEYWORD || '100' }}
+          TIKTOK_MAX_COMMENTS_PER_VIDEO: ${{ vars.TIKTOK_MAX_COMMENTS_PER_VIDEO || '30' }}
+          TIKTOK_LANGUAGE_FILTER: ${{ vars.TIKTOK_LANGUAGE_FILTER || 'en' }}
+          TIKTOK_LOOKBACK_HOURS: ${{ vars.TIKTOK_LOOKBACK_HOURS || '2160' }}
+          TIKTOK_COLLECT_COMMENTS: ${{ vars.TIKTOK_COLLECT_COMMENTS || 'true' }}
+
+          INSTAGRAM_KEYWORDS_DOCX_PATH: ./data/instagram_keywords.docx
+          INSTAGRAM_TARGET_MATCHES_PER_KEYWORD: ${{ vars.INSTAGRAM_TARGET_MATCHES_PER_KEYWORD || '10' }}
+          INSTAGRAM_SEARCH_BATCH_SIZE: ${{ vars.INSTAGRAM_SEARCH_BATCH_SIZE || '20' }}
+          INSTAGRAM_MAX_RAW_RESULTS_PER_KEYWORD: ${{ vars.INSTAGRAM_MAX_RAW_RESULTS_PER_KEYWORD || '100' }}
+          INSTAGRAM_COLLECT_COMMENTS: ${{ vars.INSTAGRAM_COLLECT_COMMENTS || 'false' }}
+          INSTAGRAM_LANGUAGE_FILTER: ${{ vars.INSTAGRAM_LANGUAGE_FILTER || 'en' }}
+          INSTAGRAM_LOOKBACK_DAYS: ${{ vars.INSTAGRAM_LOOKBACK_DAYS || '90' }}
+
+      - name: Remove credentials file
+        if: always()
+        run: rm -f data/service_account.json
