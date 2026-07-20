@@ -54,6 +54,13 @@ class SheetsWriter:
         values = worksheet.col_values(url_col_index)
         return set(values[1:])
 
+    def get_existing_urls(self, worksheet_name):
+        try:
+            worksheet = self.spreadsheet.worksheet(worksheet_name)
+        except gspread.WorksheetNotFound:
+            return set()
+        return self._existing_urls(worksheet)
+
     def write_rows(self, rows, worksheet_name, collected_at_iso):
         if not rows:
             return 0

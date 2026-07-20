@@ -1,4 +1,4 @@
-"""
+﻿"""
 Main entry point.
 """
 import logging
@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger("main")
 
 
-def build_tiktok_collector(keywords, since):
+def build_tiktok_collector(keywords, since, known_urls):
     return TikTokCollector(
         keywords=keywords, since=since, apify_token=settings.APIFY_API_TOKEN,
         search_actor_id=settings.TIKTOK_SEARCH_ACTOR_ID,
@@ -36,10 +36,11 @@ def build_tiktok_collector(keywords, since):
         max_comments_per_video=settings.TIKTOK_MAX_COMMENTS_PER_VIDEO,
         language_filter=settings.TIKTOK_LANGUAGE_FILTER,
         collect_comments=settings.TIKTOK_COLLECT_COMMENTS,
+        known_urls=known_urls,
     )
 
 
-def build_instagram_collector(keywords, since):
+def build_instagram_collector(keywords, since, known_urls):
     return InstagramCollector(
         keywords=keywords, since=since, apify_token=settings.APIFY_API_TOKEN,
         target_matches_per_keyword=settings.INSTAGRAM_TARGET_MATCHES_PER_KEYWORD,
@@ -47,6 +48,8 @@ def build_instagram_collector(keywords, since):
         max_raw_results_per_keyword=settings.INSTAGRAM_MAX_RAW_RESULTS_PER_KEYWORD,
         collect_comments=settings.INSTAGRAM_COLLECT_COMMENTS,
         language_filter=settings.INSTAGRAM_LANGUAGE_FILTER,
+        min_likes=settings.INSTAGRAM_MIN_LIKES,
+        known_urls=known_urls,
     )
 
 
@@ -103,7 +106,10 @@ def main():
         since = config["since"]()
         logger.info(f"[{platform_name}] Collecting since: {since.isoformat()}")
 
-        collector = config["build_collector"](keywords, since)
+        known_urls = writer.get_existing_urls(config["worksheet_name"])
+        logger.info(f"[{platform_name}] {len(known_urls)} URLs already in Sheet -- will skip these")
+
+        collector = config["build_collector"](keywords, since, known_urls)
 
         try:
             rows = collector.collect()
