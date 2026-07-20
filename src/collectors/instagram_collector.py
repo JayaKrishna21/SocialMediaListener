@@ -1,5 +1,5 @@
 ﻿"""
-Instagram collector, via Apify. English-only via local language detection.
+Instagram collector, via Apify.
 """
 import logging
 from datetime import datetime, timezone
@@ -26,8 +26,10 @@ class InstagramCollector(BaseCollector):
                  max_raw_results_per_keyword=100,
                  max_comments_per_post=30,
                  collect_comments=False,
-                 language_filter="en"):
-        super().__init__(keywords, since)
+                 language_filter="en",
+                 min_likes=20,
+                 known_urls=None):
+        super().__init__(keywords, since, known_urls=known_urls)
         self.apify_token = apify_token
         self.hashtag_actor_id = hashtag_actor_id
         self.comments_actor_id = comments_actor_id
@@ -37,9 +39,11 @@ class InstagramCollector(BaseCollector):
         self.max_comments_per_post = max_comments_per_post
         self.collect_comments = collect_comments
         self.language_filter = language_filter
+        self.min_likes = min_likes
 
     def collect(self):
         rows = []
+        self._seen_urls = set(self.known_urls)
         for keyword in self.keywords:
             if not keyword.startswith("#"):
                 logger.info(f"Instagram: skipping '{keyword}' -- hashtag-only")
@@ -53,7 +57,6 @@ class InstagramCollector(BaseCollector):
         matches_found = 0
         total_requested = 0
         batch_size = self.search_batch_size
-        seen_urls = set()
 
         while matches_found < self.target_matches_per_keyword and total_requested < self.max_raw_results_per_keyword:
             remaining_budget = self.max_raw_results_per_keyword - total_requested
@@ -76,15 +79,18 @@ class InstagramCollector(BaseCollector):
 
             for post in posts:
                 url = post.get("url", "")
-                if url in seen_urls or not url:
+                if url in self._seen_urls or not url:
                     continue
-                seen_urls.add(url)
+                self._seen_urls.add(url)
 
                 post_time = post.get("_parsed_time")
                 if post_time is None or post_time < self.since:
                     continue
 
                 if self.language_filter and not self._is_language_match(post.get("text", "")):
+                    continue
+
+                if post.get("_likes_count", 0) < self.min_likes:
                     continue
 
                 keyword_lower = keyword.lstrip("#").lower()
@@ -158,7 +164,11 @@ class InstagramCollector(BaseCollector):
             except ValueError:
                 parsed_time = None
 
-        return {"author": author, "url": url, "text": text, "_parsed_time": parsed_time}
+        return {
+            "author": author, "url": url, "text": text,
+            "_parsed_time": parsed_time,
+            "_likes_count": item.get("likesCount", 0),
+        }
 
     def _collect_matching_comments(self, post_url, keyword):
         run_input = {

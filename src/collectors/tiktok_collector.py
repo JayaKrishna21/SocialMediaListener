@@ -26,8 +26,9 @@ class TikTokCollector(BaseCollector):
                  max_raw_results_per_keyword=100,
                  max_comments_per_video=30,
                  language_filter="en",
-                 collect_comments=True):
-        super().__init__(keywords, since)
+                 collect_comments=True,
+                 known_urls=None):
+        super().__init__(keywords, since, known_urls=known_urls)
         self.apify_token = apify_token
         self.search_actor_id = search_actor_id
         self.hashtag_actor_id = hashtag_actor_id
@@ -41,6 +42,7 @@ class TikTokCollector(BaseCollector):
 
     def collect(self):
         rows = []
+        self._seen_urls = set(self.known_urls)
         for keyword in self.keywords:
             rows.extend(self._collect_for_keyword(keyword))
         logger.info(f"TikTok: collected {len(rows)} rows across {len(self.keywords)} keywords")
@@ -51,7 +53,6 @@ class TikTokCollector(BaseCollector):
         matches_found = 0
         total_requested = 0
         batch_size = self.search_batch_size
-        seen_urls = set()
 
         while matches_found < self.target_matches_per_keyword and total_requested < self.max_raw_results_per_keyword:
             remaining_budget = self.max_raw_results_per_keyword - total_requested
@@ -62,6 +63,13 @@ class TikTokCollector(BaseCollector):
                     videos = self._search_by_hashtag(keyword, this_batch_size)
                 else:
                     videos = self._search_by_keyword(keyword, this_batch_size)
+            except requests.HTTPError as e:
+                status = e.response.status_code if e.response is not None else None
+                if status in (401, 403):
+                    logger.error(f"TikTok auth failed for keyword '{keyword}' (HTTP {status}) -- check APIFY_API_TOKEN")
+                    raise
+                logger.warning(f"TikTok search failed for keyword '{keyword}': {e}")
+                break
             except requests.RequestException as e:
                 logger.warning(f"TikTok search failed for keyword '{keyword}': {e}")
                 break
@@ -70,9 +78,9 @@ class TikTokCollector(BaseCollector):
 
             for video in videos:
                 url = video.get("url", "")
-                if url in seen_urls:
+                if url in self._seen_urls:
                     continue
-                seen_urls.add(url)
+                self._seen_urls.add(url)
 
                 video_time = video.get("_parsed_time")
                 if video_time is None or video_time < self.since:
@@ -92,11 +100,11 @@ class TikTokCollector(BaseCollector):
                     ))
                     matches_found += 1
 
-                if self.collect_comments:
-                    try:
-                        rows.extend(self._collect_matching_comments(video, keyword))
-                    except requests.RequestException as e:
-                        logger.warning(f"TikTok comment fetch failed for video {url}: {e}")
+                    if self.collect_comments:
+                        try:
+                            rows.extend(self._collect_matching_comments(video, keyword))
+                        except requests.RequestException as e:
+                            logger.warning(f"TikTok comment fetch failed for video {url}: {e}")
 
                 if matches_found >= self.target_matches_per_keyword:
                     break
