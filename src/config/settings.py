@@ -1,4 +1,4 @@
-﻿"""
+"""
 Central configuration loader.
 """
 import os
@@ -43,6 +43,7 @@ class Settings:
     INSTAGRAM_MAX_RAW_RESULTS_PER_KEYWORD = int(os.getenv("INSTAGRAM_MAX_RAW_RESULTS_PER_KEYWORD", "200"))
     INSTAGRAM_COLLECT_COMMENTS = os.getenv("INSTAGRAM_COLLECT_COMMENTS", "false").lower() == "true"
     INSTAGRAM_LANGUAGE_FILTER = os.getenv("INSTAGRAM_LANGUAGE_FILTER", "en") or None
+    INSTAGRAM_MIN_LIKES = int(os.getenv("INSTAGRAM_MIN_LIKES", "20"))
     INSTAGRAM_KEYWORDS_DOCX_PATH = os.getenv("INSTAGRAM_KEYWORDS_DOCX_PATH", "./data/instagram_keywords.docx")
 
     GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "./data/service_account.json")
